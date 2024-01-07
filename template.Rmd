@@ -9,10 +9,11 @@ output: html_document
 # this chunk contains code that sets global options for the entire .Rmd. 
 # we use include=FALSE to suppress it from the top of the document, but it will still appear in the appendix. 
 
-knitr::opts_chunk$set(echo = FALSE) # actually set the global chunk options. 
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE) # actually set the global chunk options. 
 # we set echo=FALSE to suppress code such that it by default does not appear throughout the document. 
 # note: this is different from .Rmd defaultg
 ```
+[Repository](https://github.com/delkh/Delkh_final_assignment_472.git)
 
 Research question: "Rolling Stone Magazine ranked their 100 greatest musical artists of all time. At the end of 2023, how has their music endured? Are there any features or characteristics that seem to explain enduring engagement? "
 
@@ -22,18 +23,26 @@ primary sources:
 
 [Spotify Web API](https://developer.spotify.com/documentation/web-api)
 
-
-The renowned Rolling Stone Magazine, curated a selection of the "100 greatest" musical artists back in 2010, representing various genres and eras. From this, a question arises: At the end of 2023, how has their music endured? Are there any features or characteristics that seem to explain enduring engagement?
+Introduction: 
 
 To understand the endurance of these musical icons, we can perceive lasting engagement with their music as a measure of its endurance. Given the absence of universally accessible historical engagement data, I've employed Spotify's "Popularity" score as a metric reflecting people's current engagement with an artists' music. However, evaluating enduring engagement necessitates a practical reference point. Taylor Swift was ranked as the most popular musical artist in 2023, thus we can use her 'popularity' score as a relevant benchmark. Aligning with our assumption that "endurance" denotes lasting engagement, comparing these legendary artists' "Popularity" scores to Swift's offers valuable insights into their relative resilience and lasting impact. If these iconic artists approach or surpass a predetermined threshold—such as 50% of Taylor Swift's standing—it shows significant endurance.
 
-I have also examined genre as a main characteristic that could influence endurance. While examining genres may provide some insights into the relevance these artists over time, it remains one facet of a multifaceted analysis. Regrettably, the analysis is constrained.
+I have examined genre as a main characteristic that could influence endurance. While examining genres may provide some insights into the relevance these artists over time, it remains one facet of a multifaceted analysis. Regrettably, the analysis is constrained.
 
-The data collection process involved two primary steps. Initially, a web scraper was created to extract artist names and their rankings from the Rolling Stone's article, aggregating this information into a table named "artists_table."
+Data:
 
-Subsequently, access to the Spotify Web API was first established. A function was then developed to fetch artist data– including name, genre, popularity score, and followers- from Spotify's API. This function was systematically applied to each artist in the list, enabling the compilation of artist information for all 100 artists featured in Rolling Stone's list as well as Taylor Swift.
+Initially, a web scraper was created to extract artist names and their rankings from the Rolling Stone's article, aggregating this information into a table named "artists_table."
 
-The decision to prioritize popularity scores over follower counts was driven by a distinctive difference in their distributions. While popularity scores exhibited a more balanced and representative spread, follower counts displayed a considerably skewed distribution characterized by numerous outliers. This disparity is evident in the statistical measures obtained, where popularity scores showed a tighter distribution with only one outlier at a score of 0 (see Figure 1). The mean and median values for popularity scores were 65.24 and 67, respectively, with quartile values at 56 and 75.25. In contrast, follower counts presented a broader range, causing a distribution heavily impacted by outliers (See figure 2). The mean_followers value was 6,634,782, with a median_followers of 2,588,247 and quartiles at 1,071,410 and 7,187,520.
+Access to the Spotify Web API was first established. A function was then developed to fetch artist data– including name, genre, popularity score, and followers- from Spotify's API. This function was systematically applied to each artist in the list, enabling the compilation of artist information for all 100 artists featured in Rolling Stone's list as well as Taylor Swift.
+
+The decision to prioritize popularity scores over follower counts was driven by a distinctive difference in distributions. While popularity scores exhibited a more balanced and representative spread, follower counts displayed a considerably skewed distribution characterized by numerous outliers. Popularity scores showed a tighter distribution with only one outlier at a score of 0 (see Figure 1). The mean and median values for popularity scores were 65.24 and 67, respectively, with quartile values at 56 and 75.25. In contrast, follower counts presented a broader range, causing a distribution heavily impacted by outliers (See figure 2). The mean_followers value was 6,634,782, with a median_followers of 2,588,247 and quartiles at 1,071,410 and 7,187,520.
+
+Analysis:
+To assess the spread of artists' enduring engagement, I systematically examined the distribution of their popularity scores. This involved establishing an initial measure of enduring engagement at the 0% threshold, equivalent to the minimum popularity score, and incrementing the cutoff in 1% intervals up to 100%, mirroring Taylor Swift's maximum popularity score of 100. I calculated the percentage of artists whose scores met or exceeded the specified 'Popularity_cutoff' value at each cutoff. Figure 3 illustrates the relationship between the different 'Popularity_cutoff' values and the corresponding percentages of artists meeting these thresholds. Starting at the popularity cutoff of approximately 35%, there was a consistent decline in the number of qualifying artists. This decrease became slightly more pronounced within the range of 50% to about 85% popularity cutoff.The consistent decrease in the number of qualifying artists as we move towards higher engagement thresholds implies a select group of exceptionally enduring musical artists. Among the 100 artists assessed, an impressive 92 exhibit a popularity score of 50% or above that of Taylor Swift's at the end of 2023. However at the 75% threshold, only 28 artists maintain this level of engagement. Remarkably, only one artist from Rolling Stone's list reaches 85% and 90%, boasting a popularity score of 90.
+
+To explore whether specific genres might be associated with enduring engagement, I devised a function to assess the percentage of artists within popularity tiers ranging from 50% to 95% that featured specific genres. The genres under scrutiny represent the most common and broad music genres, which included 'rock', 'hip hop', 'rap', 'blues', 'pop', 'soul', and 'punk'.I accounted for more granular genre classifications within broader categories; for instance, genres like 'hard rock' were included in the 'rock' category. In this analysis, the popularity thresholds spanning from 50% to 95%, in 5% intervals, were chosen based on insights gleaned from Figure 3. Figure 4 plots this relationship of genre prevalence among artists meeting different popularity cutoffs. 
+
+Though figure 4 suggests that rap and hip-hop stand out as the most enduring genres a more critical approach is required considering that only Eminem, known for his rap and hip-hop music, achieved the 85% threshold. Focusing on a more representative spectrum of enduring music, between 50% and 80% popularity cutoffs, rock music is a common characteristic correlating with lasting engagement.
 
 ```{r}
 library(DBI)
@@ -228,10 +237,6 @@ print(followers_boxplot)
 ```
 
 
-To assess the spread of artists' enduring engagement, I systematically examined the distribution of their popularity scores. This involved establishing an initial measure of enduring engagement at the 0% threshold, equivalent to the minimum popularity score, and subsequently incrementing the cutoff in 1% intervals up to 100%, mirroring Taylor Swift's maximum popularity score of 100. I calculated the percentage of artists whose scores met or exceeded the specified 'Popularity_cutoff' value at each cutoff. This analysis shed light on the  spread of artists achieving various levels of enduring engagement. Figure 3 illustrates the relationship between the different 'Popularity_cutoff' values and the corresponding percentages of artists from the list meeting these thresholds. This enables the observer to decide what level of 'popularity' they consider representative of 'endurance' of an artist's music. Starting at the popularity cutoff of approximately 35%, there was a consistent decline in the number of qualifying artists. This decrease became slightly more pronounced within the range of 50% to about 85% popularity cutoff, signifying a substantial drop in the number of artists meeting these higher engagement thresholds. The consistent decrease in the number of qualifying artists as we move towards higher engagement thresholds implies a select group whose sustained popularity is indicative of exceptionally enduring musical relevance. Among the 100 artists assessed, an impressive 92 exhibit a popularity score of 50% or above that of Taylor Swift's at the end of 2023. However at the 75% threshold, only 28 artists maintain this level of engagement. Remarkably, only one artist from Rolling Stone's list reaches 85% and 90%, boasting a popularity score of 90 as of the data retrieval on December 29th, 2023, and that artist is Eminem. 
-
-
-
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -264,10 +269,7 @@ ggplot(popularity_summary, aes(x = Popularity_cutoff, y = Percent_of_artists)) +
        y = "Percentage of Artists") +
   theme_minimal()
 ```
-
-To explore whether specific genres might be associated with enduring engagement, I devised a function to assess the percentage of artists within popularity tiers ranging from 50% to 95% that featured specific genres. The genres under scrutiny represent the most common and broad music genres, which included 'rock', 'hip hop', 'rap', 'blues', 'pop', 'soul', and 'punk'.I accounted for more granular genre classifications within broader categories; for instance, genres like 'hard rock' were included in the 'rock' category. In this analysis, the popularity thresholds spanning from 50% to 95%, incrementing in 5% intervals, were chosen based on insights gleaned from Figure 3. Figure 4 plots this relationship of genre prevalence among artists meeting different popularity cutoffs. 
-
-The insights revealed in Figure 4 may initially suggest that rap and hip-hop stand out as the most enduring genres. However, considering that only one artist, Eminem- known for his rap and hip-hop music, achieved the 85% threshold among the artists in the rolling stones' list, a more critical approach is required. Focusing on a more representative spectrum of enduring music, between 50% and 80% popularity cutoffs, to ensure a reasonable pool of artists, a different narrative unfolds. Within this range, rock music emerges as the predominant genre among the enduring artists, underscoring its prevalence and resilience. It seems rock music is a common characteristic among enduring music, correlating with lasting engagement. 
+ 
 
 
 
