@@ -1,58 +1,448 @@
 ---
-title: "Assignment Template"
-author: "Dr Thomas Robinson and Dr Dan de Kadt"
+title: "Final Assignment"
+author: "delkh"
 date: "AT 2023"
 output: html_document
 ---
 
-```{r setup, include=FALSE} 
+```{r setup, include=FALSE}
 # this chunk contains code that sets global options for the entire .Rmd. 
 # we use include=FALSE to suppress it from the top of the document, but it will still appear in the appendix. 
 
 knitr::opts_chunk$set(echo = FALSE) # actually set the global chunk options. 
 # we set echo=FALSE to suppress code such that it by default does not appear throughout the document. 
-# note: this is different from .Rmd default
+# note: this is different from .Rmd defaultg
 ```
 
-This document contains the necessary commands and layout to meet the formatting requirements for MY472. You should use the template.Rmd file as the basis for your own answers to the assigned exercises.
+Research question: "Rolling Stone Magazine ranked their 100 greatest musical artists of all time. At the end of 2023, how has their music endured? Are there any features or characteristics that seem to explain enduring engagement? "
 
-## Formatting requirements
+primary sources:  
 
-* You must present all results in full sentences, as you would in a report or academic piece of writing
+[Rolling Stone's 100 Greatest Artists, 2010](https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/)
+
+[Spotify Web API](https://developer.spotify.com/documentation/web-api)
+
+
+The renowned Rolling Stone Magazine, curated a selection of the "100 greatest" musical artists back in 2010, representing various genres and eras. From this, a question arises: At the end of 2023, how has their music endured? Are there any features or characteristics that seem to explain enduring engagement?
+
+To understand the endurance of these musical icons, we can perceive lasting engagement with their music as a measure of its endurance. Given the absence of universally accessible historical engagement data, I've employed Spotify's "Popularity" score as a metric reflecting people's current engagement with an artists' music. However, evaluating enduring engagement necessitates a practical reference point. Taylor Swift was ranked as the most popular musical artist in 2023, thus we can use her 'popularity' score as a relevant benchmark. Aligning with our assumption that "endurance" denotes lasting engagement, comparing these legendary artists' "Popularity" scores to Swift's offers valuable insights into their relative resilience and lasting impact. If these iconic artists approach or surpass a predetermined threshold—such as 50% of Taylor Swift's standing—it shows significant endurance.
+
+I have also examined genre as a main characteristic that could influence endurance. While examining genres may provide some insights into the relevance these artists over time, it remains one facet of a multifaceted analysis. Regrettably, the analysis is constrained.
+
+The data collection process involved two primary steps. Initially, a web scraper was created to extract artist names and their rankings from the Rolling Stone's article, aggregating this information into a table named "artists_table."
+
+Subsequently, access to the Spotify Web API was first established. A function was then developed to fetch artist data– including name, genre, popularity score, and followers- from Spotify's API. This function was systematically applied to each artist in the list, enabling the compilation of artist information for all 100 artists featured in Rolling Stone's list as well as Taylor Swift.
+
+The decision to prioritize popularity scores over follower counts was driven by a distinctive difference in their distributions. While popularity scores exhibited a more balanced and representative spread, follower counts displayed a considerably skewed distribution characterized by numerous outliers. This disparity is evident in the statistical measures obtained, where popularity scores showed a tighter distribution with only one outlier at a score of 0 (see Figure 1). The mean and median values for popularity scores were 65.24 and 67, respectively, with quartile values at 56 and 75.25. In contrast, follower counts presented a broader range, causing a distribution heavily impacted by outliers (See figure 2). The mean_followers value was 6,634,782, with a median_followers of 2,588,247 and quartiles at 1,071,410 and 7,187,520.
+
+```{r}
+library(DBI)
+library(RSQLite)
+library(RSelenium)
+library(rvest)
+library(tidyverse)
+library(dplyr)
+library(rvest)
+library(httr)
+
+
+url <- "https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/"
+
+response <- GET(url)
+html_content <- content(response, "text")
+
+# Parse the HTML content
+html <- read_html(html_content)
+
+# Select all <h2> elements
+selected_nodes <- html %>% html_nodes("h2")
+
+# Print the text content of selected nodes
+selected_text <- selected_nodes %>% html_text()
+
+
+url2 <- "https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/the-band-2-88489/"
+
+
+response2 <- GET(url2)
+html_content2 <- content(response2, "text")
+
+# Parse the HTML content
+html2 <- read_html(html_content2)
+
+# Select all <h2> elements
+selected_nodes2 <- html2 %>% html_nodes("h2")
+
+# Print the text content of selected nodes
+selected_text2 <- selected_nodes2 %>% html_text()
+
+
+
+concatenated_list <- rev(c(selected_text[1:50], selected_text2[1:50]))
+
+# Print the concatenated list
+#print(concatenated_list)
+
+
+number_column <- 1:100
+artist_column <- concatenated_list
+
+# Combine into a data frame
+artists_table <- data.frame(Number = number_column, Artist = artist_column)
+
+# Print the table
+#print(artists_table)
+
+```
+
+```{r}
+
+library(httr)
+env_file_path <- "C:\\Users\\daelk\\OneDrive\\Desktop\\lse\\MY472\\spotify.env"
+
+# Read the .env file using the specified path
+readRenviron(env_file_path)
+client_id <- Sys.getenv("client_id")
+client_secret <- Sys.getenv("client_secret")
+
+# Define the URL
+token_url <- "https://accounts.spotify.com/api/token"
+
+# Create a body with the grant_type and client credentials
+body <- list(
+  grant_type = "client_credentials",
+  client_id = client_id,
+  client_secret = client_secret
+)
+
+# Make a POST request to obtain the access token
+response <- POST(token_url, body = body, encode = "form")
+
+# Extract the access token from the response
+access_token <- content(response)$access_token
+
+```
+
+
+```{r}
+library(httr)
+library(jsonlite)
+
+# Function to fetch artist information from Spotify API
+get_artist_info <- function(artist_name, access_token) {
+  # Your Spotify API access token (replace 'YOUR_ACCESS_TOKEN' with your actual token)
+
   
-  * If the exercise requires generating a table or figure, you should include at least one sentence introducing and explaining it. E.g. "The table below reports the counts of Wikipedia articles mentioning the LSE, by type of article."
+  # Base URL for Spotify API endpoints
+  base_url <- "https://api.spotify.com/v1/search"
+  
+  # API request to search for the artist
+  response <- GET(
+    url = base_url,
+    query = list(q = artist_name, type = "artist"),
+    add_headers(Authorization = paste("Bearer", access_token))
+  )
+  
+  # Extracting relevant information from the API response
+  if (http_type(response) == "application/json") {
+    artist_info <- content(response, as = "parsed")
+    if (length(artist_info$artists$items) > 0) {
+      # Extract necessary information (e.g., genre, popularity, followers, etc.)
+      artist <- artist_info$artists$items[[1]]
+      artist_data <- data.frame(
+        Artist = artist$name,
+        Genres = toString(artist$genres),
+        Popularity = artist$popularity,
+        Followers = artist$followers$total
+        # Add more fields as needed
+      )
+      return(artist_data)
+    } else {
+      return(NULL)  # Artist not found
+    }
+  } else {
+    return(NULL)  # Invalid response
+  }
+}
 
-* Unless stated otherwise, all code used to answer the exercises should be included as a code appendix at the end of the script. This formatting can be achieved by following the guidance in this template file.
+# Assuming `artists_table` contains the table with artist names
+artist_names <- artists_table$Artist
 
-* All code should be annotated with comments, to help the marker understand what you have done
 
-* Your output should be replicable. Any result/table/figure that cannot be traced back to your code will not be marked
+# Iterate through each artist in the table and fetch their information
+artist_info_list <- lapply(artist_names, function(artist) {
+  get_artist_info(artist, access_token)
+})
 
-## Example of in-line figures without code
+# Combine the fetched information into a single data frame
+combined_info <- do.call(rbind, Filter(Negate(is.null), artist_info_list))
 
-For those interested, we achieve the formatting requirements in two-steps: 1) in the `setup` chunk, we set `knitr::opts_chunk$set(echo = FALSE)` so that code is not included (echoed) by default in code chunks; 2) we add a specific chunk at the end of the file to collect and print *all* the code in the Rmarkdown file. Do not delete the final code chunk from the template!
-
-For example, below we use a code chunk to generate random data and include a scatter plot in-line. The code used to generate this chart is only reported at the end of the document. 
-
-```{r plot_example}
-set.seed(89) # set a seed for R's psuedo-randomiser, for replicability.
-x <- rnorm(100) # randomly draw 100 obs from normal distribution, save as object
-y <- rnorm(100) 
-plot(x,y) # two-way scatterplot using R's default plotting
+# Print the combined information
+#print(combined_info)
 ```
 
-In specific instances, however, you may be directed to report your code in-line (or you may want to do this to illustrate a specific point). In these cases, we can override the default behaviour by adding the chunk option `echo = TRUE` to a specific R chunk. When `echo=TRUE`, your code is presented in-line with any output displayed afterwards. The same code will also be included in the appendix at the bottom of the document (which is fine).
+```{r}
 
-```{r echo_example, echo=TRUE}
-# {[language] [chunk_name], [chunk_options]}
-# here we use echo=TRUE to override our global options and make the chunk appear exactly here. 
+library(dplyr)
+library(ggplot2)
 
-print("This code chunk is visible in this section.")
+# Calculate statistics for popularity score
+popularity_stats <- combined_info %>%
+  summarize(
+    mean_popularity = mean(Popularity),
+    median_popularity = median(Popularity),
+    q1_popularity = quantile(Popularity, 0.25),
+    q3_popularity = quantile(Popularity, 0.75)
+  )
+
+# Calculate statistics for followers
+followers_stats <- combined_info %>%
+  summarize(
+    mean_followers = mean(Followers),
+    median_followers = median(Followers),
+    q1_followers = quantile(Followers, 0.25),
+    q3_followers = quantile(Followers, 0.75)
+  )
+
+# Create a boxplot for popularity score and followers
+popularity_boxplot <- ggplot(combined_info, aes(x = "", y = Popularity)) +
+  geom_boxplot() +
+  labs(title = "Figure 1 - Boxplot of Popularity Score")
+
+followers_boxplot <- ggplot(combined_info, aes(x = "", y = Followers)) +
+  geom_boxplot() +
+  labs(title = "Figure 2 - Boxplot of Followers") +  
+  scale_y_continuous(labels = scales::number_format())
+
+
+```
+
+```{r, eval=TRUE}
+print(popularity_boxplot)
+```
+
+
+```{r, eval=TRUE}
+print(followers_boxplot)
+
+```
+
+
+To assess the spread of artists' enduring engagement, I systematically examined the distribution of their popularity scores. This involved establishing an initial measure of enduring engagement at the 0% threshold, equivalent to the minimum popularity score, and subsequently incrementing the cutoff in 1% intervals up to 100%, mirroring Taylor Swift's maximum popularity score of 100. I calculated the percentage of artists whose scores met or exceeded the specified 'Popularity_cutoff' value at each cutoff. This analysis shed light on the  spread of artists achieving various levels of enduring engagement. Figure 3 illustrates the relationship between the different 'Popularity_cutoff' values and the corresponding percentages of artists from the list meeting these thresholds. This enables the observer to decide what level of 'popularity' they consider representative of 'endurance' of an artist's music. Starting at the popularity cutoff of approximately 35%, there was a consistent decline in the number of qualifying artists. This decrease became slightly more pronounced within the range of 50% to about 85% popularity cutoff, signifying a substantial drop in the number of artists meeting these higher engagement thresholds. The consistent decrease in the number of qualifying artists as we move towards higher engagement thresholds implies a select group whose sustained popularity is indicative of exceptionally enduring musical relevance. Among the 100 artists assessed, an impressive 92 exhibit a popularity score of 50% or above that of Taylor Swift's at the end of 2023. However at the 75% threshold, only 28 artists maintain this level of engagement. Remarkably, only one artist from Rolling Stone's list reaches 85% and 90%, boasting a popularity score of 90 as of the data retrieval on December 29th, 2023, and that artist is Eminem. 
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+
+TS_info_list <- get_artist_info("Taylor Swift", access_token)
+
+# Create an empty data frame to store the results
+popularity_summary <- data.frame(
+  "Popularity_cutoff" = 0:100,  # Popularity cutoff values from 0 to 100
+  "Percent_of_artists" = NA    # Initialize the Percent_of_artists column with NA
+)
+
+# Calculate the percentage of artists meeting each Popularity_cutoff
+for (i in 1:nrow(popularity_summary)) {
+  popularity_cutoff <- popularity_summary[i, "Popularity_cutoff"]
+  percent_artists <- nrow(filter(combined_info, Popularity >= popularity_cutoff)) / nrow(combined_info) * 100
+  popularity_summary[i, "Percent_of_artists"] <- percent_artists
+}
+
+View(popularity_summary)
+```
+
+```{r, eval=TRUE}
+
+ggplot(popularity_summary, aes(x = Popularity_cutoff, y = Percent_of_artists)) +
+  geom_line(color = "blue") +
+  labs(title = "Figure 3 - Percentage of Artists by Popularity Cutoff",
+       x = "Popularity Cutoff",
+       y = "Percentage of Artists") +
+  theme_minimal()
+```
+
+To explore whether specific genres might be associated with enduring engagement, I devised a function to assess the percentage of artists within popularity tiers ranging from 50% to 95% that featured specific genres. The genres under scrutiny represent the most common and broad music genres, which included 'rock', 'hip hop', 'rap', 'blues', 'pop', 'soul', and 'punk'.I accounted for more granular genre classifications within broader categories; for instance, genres like 'hard rock' were included in the 'rock' category. In this analysis, the popularity thresholds spanning from 50% to 95%, incrementing in 5% intervals, were chosen based on insights gleaned from Figure 3. Figure 4 plots this relationship of genre prevalence among artists meeting different popularity cutoffs. 
+
+The insights revealed in Figure 4 may initially suggest that rap and hip-hop stand out as the most enduring genres. However, considering that only one artist, Eminem- known for his rap and hip-hop music, achieved the 85% threshold among the artists in the rolling stones' list, a more critical approach is required. Focusing on a more representative spectrum of enduring music, between 50% and 80% popularity cutoffs, to ensure a reasonable pool of artists, a different narrative unfolds. Within this range, rock music emerges as the predominant genre among the enduring artists, underscoring its prevalence and resilience. It seems rock music is a common characteristic among enduring music, correlating with lasting engagement. 
+
+
+
+```{r}
+#preparing for genre analysis
+
+popularity_thresholds <- c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95)
+
+# Calculate percentages for different popularity thresholds and create data frames
+for (threshold in popularity_thresholds) {
+  # Filter data based on popularity threshold
+  filtered_data <- combined_info %>%
+    filter(Popularity >= threshold)
+  
+  # Create a data frame for each threshold
+  assign(paste0("enduring_artists_", threshold), filtered_data)
+}
+
+calculate_genre_percentage <- function(data, genres_column, genre) {
+  num_genre_artists <- data %>%
+    filter(grepl(genre, tolower(.data[[genres_column]]))) %>%
+    nrow()
+  
+  percentage_genre_artists <- (num_genre_artists / nrow(data)) * 100
+  
+  return(percentage_genre_artists)
+}
+
+# Calculate percentages for different datasets and genres
+rock_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "rock")
+rock_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "rock")
+rock_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "rock")
+rock_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "rock")
+rock_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "rock")
+rock_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "rock")
+rock_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "rock")
+rock_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "rock")
+rock_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "rock")
+rock_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "rock")
+
+hiphop_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "hip hop")
+hiphop_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "hip hop")
+hiphop_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "hip hop")
+hiphop_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "hip hop")
+hiphop_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "hip hop")
+hiphop_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "hip hop")
+hiphop_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "hip hop")
+hiphop_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "hip hop")
+hiphop_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "hip hop")
+hiphop_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "hip hop")
+
+rap_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "rap")
+rap_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "rap")
+rap_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "rap")
+rap_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "rap")
+rap_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "rap")
+rap_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "rap")
+rap_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "rap")
+rap_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "rap")
+rap_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "rap")
+rap_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "rap")
+
+blues_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "blues")
+blues_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "blues")
+blues_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "blues")
+blues_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "blues")
+blues_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "blues")
+blues_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "blues")
+blues_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "blues")
+blues_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "blues")
+blues_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "blues")
+blues_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "blues")
+
+pop_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "pop")
+pop_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "pop")
+pop_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "pop")
+pop_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "pop")
+pop_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "pop")
+pop_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "pop")
+pop_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "pop")
+pop_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "pop")
+pop_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "pop")
+pop_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "pop")
+
+soul_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "soul")
+soul_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "soul")
+soul_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "soul")
+soul_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "soul")
+soul_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "soul")
+soul_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "soul")
+soul_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "soul")
+soul_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "soul")
+soul_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "soul")
+soul_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "soul")
+
+punk_artists_percent_50 <- calculate_genre_percentage(enduring_artists_50, "Genres", "punk")
+punk_artists_percent_55 <- calculate_genre_percentage(enduring_artists_55, "Genres", "punk")
+punk_artists_percent_60 <- calculate_genre_percentage(enduring_artists_60, "Genres", "punk")
+punk_artists_percent_65 <- calculate_genre_percentage(enduring_artists_65, "Genres", "punk")
+punk_artists_percent_70 <- calculate_genre_percentage(enduring_artists_70, "Genres", "punk")
+punk_artists_percent_75 <- calculate_genre_percentage(enduring_artists_75, "Genres", "punk")
+punk_artists_percent_80 <- calculate_genre_percentage(enduring_artists_80, "Genres", "punk")
+punk_artists_percent_85 <- calculate_genre_percentage(enduring_artists_85, "Genres", "punk")
+punk_artists_percent_90 <- calculate_genre_percentage(enduring_artists_90, "Genres", "punk")
+punk_artists_percent_95 <- calculate_genre_percentage(enduring_artists_95, "Genres", "punk")
+```
+
+```{r}
+#accumulating the genre data into data frames
+rock_percentages <- data.frame(
+  "Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "Rock_Percentage" = c(rock_artists_percent_50, rock_artists_percent_55, rock_artists_percent_60, rock_artists_percent_65, rock_artists_percent_70, rock_artists_percent_75, rock_artists_percent_80, rock_artists_percent_85, rock_artists_percent_90, rock_artists_percent_95)
+)
+
+hiphop_percentages <- data.frame(
+  "Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "HipHop_Percentage" = c( hiphop_artists_percent_50, hiphop_artists_percent_55, hiphop_artists_percent_60, hiphop_artists_percent_65, hiphop_artists_percent_70, hiphop_artists_percent_75, hiphop_artists_percent_80, hiphop_artists_percent_85, hiphop_artists_percent_90, hiphop_artists_percent_95)
+)
+
+rap_percentages <- data.frame(
+  "Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "Rap_Percentage" = c(rap_artists_percent_50, rap_artists_percent_55, rap_artists_percent_60, rap_artists_percent_65, rap_artists_percent_70, rap_artists_percent_75, rap_artists_percent_80, rap_artists_percent_85, rap_artists_percent_90, rap_artists_percent_95)
+)
+
+blues_percentages <- data.frame(
+"Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "Blues_Percentage" = c( blues_artists_percent_50, blues_artists_percent_55, blues_artists_percent_60, blues_artists_percent_65, blues_artists_percent_70, blues_artists_percent_75, blues_artists_percent_80, blues_artists_percent_85, blues_artists_percent_90, blues_artists_percent_95)
+)
+
+pop_percentages <- data.frame(
+ "Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "Pop_Percentage" = c( pop_artists_percent_50, pop_artists_percent_55, pop_artists_percent_60, pop_artists_percent_65, pop_artists_percent_70, pop_artists_percent_75, pop_artists_percent_80, pop_artists_percent_85, pop_artists_percent_90, pop_artists_percent_95)
+)
+
+soul_percentages <- data.frame(
+  "Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "Soul_Percentage" = c( soul_artists_percent_50, soul_artists_percent_55, soul_artists_percent_60, soul_artists_percent_65, soul_artists_percent_70, soul_artists_percent_75, soul_artists_percent_80, soul_artists_percent_85, soul_artists_percent_90, soul_artists_percent_95)
+)
+
+punk_percentages <- data.frame(
+  "Dataset" = c(50, 55, 60, 65, 70, 75, 80, 85, 90, 95),
+  "Punk_Percentage" = c(punk_artists_percent_50, punk_artists_percent_55, punk_artists_percent_60, punk_artists_percent_65, punk_artists_percent_70, punk_artists_percent_75, punk_artists_percent_80, punk_artists_percent_85, punk_artists_percent_90, punk_artists_percent_95)
+)
+
+
+#combining into one dataframe
+
+
+# Pivoting each genre dataframe
+rock_long <- pivot_longer(rock_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+hiphop_long <- pivot_longer(hiphop_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+rap_long <- pivot_longer(rap_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+blues_long <- pivot_longer(blues_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+pop_long <- pivot_longer(pop_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+soul_long <- pivot_longer(soul_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+punk_long <- pivot_longer(punk_percentages, cols = -Dataset, names_to = "Genre", values_to = "Percentage")
+
+# Combine all pivoted dataframes
+combined_genres_long <- bind_rows(rock_long, hiphop_long, rap_long, blues_long, pop_long, soul_long, punk_long)
+```
+
+```{r, eval=TRUE}
+# Plotting
+ggplot(combined_genres_long, aes(x = Dataset, y = Percentage, color = Genre, linetype = Genre)) +
+  geom_line(size = 1.2) +
+  labs(title = "Figure 4 - Percentage of Artists by Genre and Popularity Cutoff",
+       x = "Popularity Cutoff",
+       y = "Percentage of Artists with Genre") +
+    scale_linetype_manual(values = c("solid", "dashed", "dotdash", "longdash", "dotted","twodash", "dashed", "solid", "dotted", "dotdash"))  +
+  theme_minimal()
 ```
 
 ## Appendix: All code in this assignment
 
-```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE} 
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
 # this chunk generates the complete code appendix. 
 # eval=FALSE tells R not to run (``evaluate'') the code here (it was already run before).
 ```
